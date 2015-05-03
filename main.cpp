@@ -1,5 +1,7 @@
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/features2d/features2d.hpp>
+#include <opencv2/nonfree/features2d.hpp>
 #include <iostream>
 
 int main() {
@@ -14,9 +16,20 @@ int main() {
     
     // Loop until the user presses any key
     while (true) {
-        cv::Mat cameraFrame;
-        webcam.read(cameraFrame);
-        cv::imshow("Webcam", cameraFrame);
+
+        // Get current frame
+        cv::Mat frame, out;
+        webcam.read(frame);
+
+        // Vector of keypoints
+        std::vector<cv::KeyPoint> kp;
+
+        int hessian = 1500;
+        cv::SurfFeatureDetector surf(hessian);
+        surf.detect(frame, kp);
+        cv::drawKeypoints(frame, kp, out, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        
+        cv::imshow("Webcam with keypoints", out);
         if (cv::waitKey(30) >= 0)
             break;
     }
