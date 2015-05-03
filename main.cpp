@@ -15,7 +15,7 @@ int main() {
     }
 
     // Feature detection
-    int hessian = 1500;
+    int hessian = 750;
     cv::SurfFeatureDetector surf(hessian);
 
     // Descriptor extractor
