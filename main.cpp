@@ -20,7 +20,7 @@ int main() {
     }
 
     // Feature detection
-    int hessian = 200;
+    int hessian = 100;
     int octaves = 4;
     int octaveLayers = 2;
     bool extended = false;
