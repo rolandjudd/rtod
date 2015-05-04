@@ -2,6 +2,11 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/nonfree/features2d.hpp>
+#include "opencv2/core/core.hpp"
+#include "opencv2/features2d/features2d.hpp"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/calib3d/calib3d.hpp"
+#include "opencv2/nonfree/nonfree.hpp"
 #include <iostream>
 
 int main() {
@@ -15,10 +20,10 @@ int main() {
     }
 
     // Feature detection
-    int hessian = 500;
+    int hessian = 200;
     int octaves = 4;
     int octaveLayers = 2;
-    bool extended = true;
+    bool extended = false;
     bool upright = true;
     cv::SurfFeatureDetector surf(hessian, octaves, octaveLayers, extended, upright);
 
@@ -36,9 +41,9 @@ int main() {
     cv::Mat textbook_descriptors;
     surf.detect(textbook, textbook_kp);
     extractor.compute(textbook, textbook_kp, textbook_descriptors);
-    cv::drawKeypoints(textbook, textbook_kp, textbook_out, cv::Scalar(255, 255, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-    cv::namedWindow("Textbook", cv::WINDOW_AUTOSIZE );
-    cv::imshow("Textbook", textbook_out);
+    //cv::drawKeypoints(textbook, textbook_kp, textbook_out, cv::Scalar(255, 255, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+    //cv::namedWindow("Textbook", cv::WINDOW_AUTOSIZE );
+    //cv::imshow("Textbook", textbook_out);
 
     // Open a window to display the webcam video
     cv::namedWindow("Webcam", cv::WINDOW_AUTOSIZE );
@@ -47,7 +52,7 @@ int main() {
     while (true) {
 
         // Get current frame
-        cv::Mat frame, out;
+        cv::Mat frame;
         webcam.read(frame);
 
         // Keypoints and descriptors
@@ -57,7 +62,8 @@ int main() {
         surf.detect(frame, kp);
         extractor.compute(frame, kp, descriptors);
         
-        cv::drawKeypoints(frame, kp, out, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        cv::Mat out(frame);
+        // cv::drawKeypoints(frame, kp, out, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
         
         // Perform matching
         std::vector< std::vector< cv::DMatch > > matches;
@@ -66,7 +72,7 @@ int main() {
         // Perform ratio test on matches
         std::vector< cv::DMatch > good_matches;
 
-        float ratio = 0.50f;
+        float ratio = 0.75f;
         
         for(int i = 0; i < matches.size(); i++)
         {
@@ -82,11 +88,43 @@ int main() {
             }
         }
 
-        std::cout << "Found " << good_matches.size() << " matching points" << std::endl;
+        std::cout << "Textbook: " << good_matches.size() << " matching points" << std::endl;
+
+        if(good_matches.size() > 50) {
+        
+            std::vector<cv::Point2f> textbook_pt;
+            std::vector<cv::Point2f> frame_pt;
+
+            for(int i = 0; i < good_matches.size(); i++) {
+                textbook_pt.push_back(textbook_kp[good_matches[i].queryIdx].pt);
+                frame_pt.push_back(kp[good_matches[i].trainIdx].pt);
+            }
+            
+            cv::Mat h = cv::findHomography(textbook_pt, frame_pt, CV_RANSAC);
+
+            // Get the corners of the object
+            std::vector<cv::Point2f> textbook_corners(4);
+            textbook_corners[0] = cv::Point2f(0,0);
+            textbook_corners[1] = cv::Point2f(textbook.cols, 0);
+            textbook_corners[2] = cv::Point2f(textbook.cols, textbook.rows);
+            textbook_corners[3] = cv::Point2f(0, textbook.rows);
+
+            // Transform the image using the homography
+            std::vector<cv::Point2f> frame_corners(4);
+            cv::perspectiveTransform(textbook_corners, frame_corners, h);
+            
+            // Draw lines around the object
+            cv::Scalar color(255, 0, 0);
+            cv::line(out, frame_corners[0], frame_corners[1], color, 2);
+            cv::line(out, frame_corners[1], frame_corners[2], color, 2);
+            cv::line(out, frame_corners[2], frame_corners[3], color, 2);
+            cv::line(out, frame_corners[3], frame_corners[0], color, 2); 
+        }
         
         cv::imshow("Webcam", out);
         if (cv::waitKey(30) >= 0)
             break;
     }
+    
     return 0;
 }
