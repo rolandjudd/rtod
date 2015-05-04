@@ -15,8 +15,12 @@ int main() {
     }
 
     // Feature detection
-    int hessian = 750;
-    cv::SurfFeatureDetector surf(hessian);
+    int hessian = 500;
+    int octaves = 4;
+    int octaveLayers = 2;
+    bool extended = true;
+    bool upright = true;
+    cv::SurfFeatureDetector surf(hessian, octaves, octaveLayers, extended, upright);
 
     // Descriptor extractor
     cv::SurfDescriptorExtractor extractor;
@@ -35,6 +39,9 @@ int main() {
     cv::drawKeypoints(textbook, textbook_kp, textbook_out, cv::Scalar(255, 255, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
     cv::namedWindow("Textbook", cv::WINDOW_AUTOSIZE );
     cv::imshow("Textbook", textbook_out);
+
+    // Open a window to display the webcam video
+    cv::namedWindow("Webcam", cv::WINDOW_AUTOSIZE );
     
     // Loop until the user presses any key
     while (true) {
@@ -59,7 +66,7 @@ int main() {
         // Perform ratio test on matches
         std::vector< cv::DMatch > good_matches;
 
-        float ratio = 0.70f;
+        float ratio = 0.50f;
         
         for(int i = 0; i < matches.size(); i++)
         {
@@ -76,8 +83,7 @@ int main() {
         }
 
         std::cout << "Found " << good_matches.size() << " matching points" << std::endl;
-
-        cv::namedWindow("Webcam", cv::WINDOW_AUTOSIZE );
+        
         cv::imshow("Webcam", out);
         if (cv::waitKey(30) >= 0)
             break;
