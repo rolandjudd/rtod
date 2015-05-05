@@ -19,6 +19,10 @@ int main() {
         std::cerr << "ERROR: Cannot open video stream" << std::endl;
     }
 
+    // Change resolution of webcam
+    webcam.set(CV_CAP_PROP_FRAME_WIDTH,640);
+    webcam.set(CV_CAP_PROP_FRAME_HEIGHT,480);
+    
     // Feature detection
     int hessian = 100;
     int octaves = 4;
