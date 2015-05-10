@@ -24,8 +24,8 @@ class Target {
         std::vector<cv::Point2f> corners;
     public:
         Target(std::string);
-        void get_keypoints(cv::SurfFeatureDetector detector);
-        void get_descriptors(cv::SurfDescriptorExtractor extractor);
+        void get_keypoints(cv::SiftFeatureDetector detector);
+        void get_descriptors(cv::SiftDescriptorExtractor extractor);
 };
 
 // Constructor for Target class initializes image, name, gray, corners
@@ -51,11 +51,11 @@ Target::Target(std::string target_name) {
 // get_keypoints and get_descriptors sets the Target's keypoints and descriptors 
 // based on provided detector and extractor functions
 
-void Target::get_keypoints(cv::SurfFeatureDetector detector) {
+void Target::get_keypoints(cv::SiftFeatureDetector detector) {
     detector.detect(image, kp);
 }
 
-void Target::get_descriptors(cv::SurfDescriptorExtractor extractor) {
+void Target::get_descriptors(cv::SiftDescriptorExtractor extractor) {
     extractor.compute(image, kp, descriptors);
 }
 
@@ -82,10 +82,9 @@ int main(int argc, char* argv[]) {
     // Initialize webcam
     cv::VideoCapture webcam = init_webcam(0);
 
-    // Initialize SURF
-    int minHessian = 25;
-    cv::SurfFeatureDetector detector(minHessian);
-    cv::SurfDescriptorExtractor extractor;
+    // Initialize SIFT
+    cv::SiftFeatureDetector detector;
+    cv::SiftDescriptorExtractor extractor;
 
     // Initialize Matcher
     cv::FlannBasedMatcher matcher;
@@ -96,16 +95,13 @@ int main(int argc, char* argv[]) {
         loaded.get_keypoints(detector);
         loaded.get_descriptors(extractor);
         targets.push_back(loaded);
+
+        cv::Mat out;
+        cv::drawKeypoints(loaded.image, loaded.kp, out, cv::Scalar(255, 255, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        cv::namedWindow(loaded.name, cv::WINDOW_AUTOSIZE);
+        cv::imshow(loaded.name, out);
     }
     
-    //  cv::Mat textbook_out;
-    
-    // Get the corners of the object
-    
-    //cv::drawKeypoints(textbook, textbook_kp, textbook_out, cv::Scalar(255, 255, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-    //cv::namedWindow("Textbook", cv::WINDOW_AUTOSIZE );
-    //cv::imshow("Textbook", textbook_out);
-
     // Open a window to display the webcam video
     cv::namedWindow("Webcam", cv::WINDOW_AUTOSIZE );
 
@@ -164,9 +160,9 @@ int main(int argc, char* argv[]) {
                     }
                 }
                 
-                //std::cout << "Textbook: " << good_matches.size() << " matching points" << std::endl;
+                std::cout << targets[i].name << ": " << good_matches.size() << " matching points" << std::endl;
                 
-                if(good_matches.size() > 25) {
+                if(good_matches.size() > 10) {
                     
                     std::cout << targets[i].name << " detected - tracking..." << std::endl;
                     
@@ -181,7 +177,7 @@ int main(int argc, char* argv[]) {
                     cv::goodFeaturesToTrack(targets[i].gray, tracking_pts[0], 200, 0.01, 10, cv::Mat(), 3, 0, 0.04);
                     tracking_pts[0].insert(tracking_pts[0].end(), targets[i].corners.begin(), targets[i].corners.end());  
                     cv::Mat h = cv::findHomography(target_pt, frame_pt, CV_RANSAC, 10);
-
+                    
                     tracking_pts_count = tracking_pts[0].size();
                     
                     // Transform the tracking points using the homography
