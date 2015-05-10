@@ -11,43 +11,51 @@
 #include <iostream>
 
 // Global path for image loads; reconfigure to whatever directory you choose
-string path = "images/";
+std::string base_path = "images/";
 
 // Target class to store data for object needing detection
 class Target {
     public:
         std::string name;
         cv::Mat image;
-        cv::Mat grayscale;
+        cv::Mat gray;
         std::vector<cv::KeyPoint> kp;
         cv::Mat descriptors;
-        std::vector<cv::Point2f> corners(4);
+        std::vector<cv::Point2f> corners;
     public:
         Target(std::string);
-        Target::get_keypoints(SurfFeatureDetector detector);
-        Target::get_descriptors(SurfDescriptorExtractor extractor);
+        void get_keypoints(cv::SurfFeatureDetector detector);
+        void get_descriptors(cv::SurfDescriptorExtractor extractor);
 };
 
-// Constructor for Target class initializes image, name, grayscale, corners
+// Constructor for Target class initializes image, name, gray, corners
 
-void Target::Target(std::string imagename) {
-    name = imagename;
-    image = cv::imread(path + imagename + "jpg");
-    cv::cvtColor(image, grayscale, CV_BGR2GRAY);
-    corners[0] = cv::Point2f(1,1);
-    corners[1] = cv::Point2f(image.cols - 1, 1);
-    corners[2] = cv::Point2f(image.cols - 1, image.rows - 1);
-    corners[3] = cv::Point2f(1, image.rows - 1);
+Target::Target(std::string target_name) {
+
+    name = target_name;
+    std::string path = base_path + name + ".jpg";
+    image = cv::imread(path);
+
+    if(!image.data) {
+        std::cerr << "Failed to load " << path << std::endl;
+        exit(1);
+    }
+    
+    cv::cvtColor(image, gray, CV_BGR2GRAY);
+    corners.push_back(cv::Point2f(1,1));
+    corners.push_back(cv::Point2f(image.cols - 1, 1));
+    corners.push_back(cv::Point2f(image.cols - 1, image.rows - 1));
+    corners.push_back(cv::Point2f(1, image.rows - 1));
 }
 
 // get_keypoints and get_descriptors sets the Target's keypoints and descriptors 
 // based on provided detector and extractor functions
 
-void Target::get_keypoints(SurfFeatureDetector detector) {
+void Target::get_keypoints(cv::SurfFeatureDetector detector) {
     detector.detect(image, kp);
 }
 
-void Target::get_descriptors(SurfDescriptorExtractor extractor) {
+void Target::get_descriptors(cv::SurfDescriptorExtractor extractor) {
     extractor.compute(image, kp, descriptors);
 }
 
@@ -72,7 +80,7 @@ int main(int argc, char* argv[]) {
     std::vector<Target> targets;
 
     // Initialize webcam
-    webcam = init_webcam(0);
+    cv::VideoCapture webcam = init_webcam(0);
 
     // Initialize SURF
     int minHessian = 25;
@@ -83,7 +91,7 @@ int main(int argc, char* argv[]) {
     cv::FlannBasedMatcher matcher;
 
     // Iterate through images provided as arguments to create new targets.
-    for (int i = 0; i < argc; i++) {
+    for (int i = 1; i < argc; i++) {
         Target loaded = Target(std::string(argv[i]));
         loaded.get_keypoints(detector);
         loaded.get_descriptors(extractor);
@@ -142,14 +150,14 @@ int main(int argc, char* argv[]) {
                 
                 float ratio = 0.6f;
                 
-                for(int i = 0; i < matches.size(); i++)
+                for(int j = 0; j < matches.size(); j++)
                 {
-                    if (matches[i].size() < 2) {
+                    if (matches[j].size() < 2) {
                         continue;
                     }
                     
-                    const cv::DMatch &m1 = matches[i][0];
-                    const cv::DMatch &m2 = matches[i][1];
+                    const cv::DMatch &m1 = matches[j][0];
+                    const cv::DMatch &m2 = matches[j][1];
                     
                     if(m1.distance <= ratio * m2.distance) {
                         good_matches.push_back(m1);
@@ -165,9 +173,9 @@ int main(int argc, char* argv[]) {
                     std::vector<cv::Point2f> target_pt;
                     std::vector<cv::Point2f> frame_pt;
                     
-                    for(int i = 0; i < good_matches.size(); i++) {
-                        target_pt.push_back(targets[i].kp[good_matches[i].queryIdx].pt);
-                        frame_pt.push_back(kp[good_matches[i].trainIdx].pt);
+                    for(int j = 0; j < good_matches.size(); j++) {
+                        target_pt.push_back(targets[i].kp[good_matches[j].queryIdx].pt);
+                        frame_pt.push_back(kp[good_matches[j].trainIdx].pt);
                     }
                     
                     cv::goodFeaturesToTrack(targets[i].gray, tracking_pts[0], 200, 0.01, 10, cv::Mat(), 3, 0, 0.04);
@@ -180,7 +188,7 @@ int main(int argc, char* argv[]) {
                     cv::perspectiveTransform(tracking_pts[0], tracking_pts[1], h);
                     
                     tracking = true;
-                    tracking_target = targets[i];
+                    tracking_target = &targets[i];
                 }
             }
 
