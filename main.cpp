@@ -10,10 +10,51 @@
 #include "opencv2/video/tracking.hpp"
 #include <iostream>
 
-int main() {
+// Global path for image loads; reconfigure to whatever directory you choose
+string path = "images/";
 
+// Target class to store data for object needing detection
+class Target {
+    public:
+        std::string name;
+        cv::Mat image;
+        cv::Mat grayscale;
+        std::vector<cv::KeyPoint> kp;
+        cv::Mat descriptors;
+        std::vector<cv::Point2f> corners(4);
+    public:
+        Target(std::string);
+        Target::get_keypoints(SurfFeatureDetector detector);
+        Target::get_descriptors(SurfDescriptorExtractor extractor);
+};
+
+// Constructor for Target class initializes image, name, grayscale, corners
+
+void Target::Target(std::string imagename) {
+    name = imagename;
+    image = cv::imread(path + imagename + "jpg");
+    cv::cvtColor(image, grayscale, CV_BGR2GRAY);
+    corners[0] = cv::Point2f(1,1);
+    corners[1] = cv::Point2f(image.cols - 1, 1);
+    corners[2] = cv::Point2f(image.cols - 1, image.rows - 1);
+    corners[3] = cv::Point2f(1, image.rows - 1);
+}
+
+// get_keypoints and get_descriptors sets the Target's keypoints and descriptors 
+// based on provided detector and extractor functions
+
+void Target::get_keypoints(SurfFeatureDetector detector) {
+    detector.detect(image, kp);
+}
+
+void Target::get_descriptors(SurfDescriptorExtractor extractor) {
+    extractor.compute(image, kp, descriptors);
+}
+
+// Simple function to initialize a webcam given its id
+cv::VideoCapture init_webcam(int id) {
     // 0 is the id of the video device (webcam)
-    cv::VideoCapture webcam = cv::VideoCapture(0);
+    cv::VideoCapture webcam = cv::VideoCapture(id);
 
     //check if video stream was opened successfully
     if (!webcam.isOpened()) {
@@ -23,32 +64,35 @@ int main() {
     // Change resolution of webcam
     webcam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
     webcam.set(CV_CAP_PROP_FRAME_HEIGHT,480);
-    
-    // SURF
+    return webcam;
+}
+
+int main(int argc, char* argv[]) {
+
+    std::vector<Target> targets;
+
+    // Initialize webcam
+    webcam = init_webcam(0);
+
+    // Initialize SURF
     int minHessian = 25;
     cv::SurfFeatureDetector detector(minHessian);
     cv::SurfDescriptorExtractor extractor;
-    
-    // Matcher
-    cv::FlannBasedMatcher matcher;
-    
-    // Load the image of the textbook
-    cv::Mat textbook = cv::imread("images/textbook.jpg");
-    cv::Mat textbook_gray;
-    cv::cvtColor(textbook, textbook_gray, CV_BGR2GRAY); 
-    cv::Mat textbook_out;
-    
-    std::vector<cv::KeyPoint> textbook_kp;
-    cv::Mat textbook_descriptors;
-    detector.detect(textbook, textbook_kp);
-    extractor.compute(textbook, textbook_kp, textbook_descriptors);
 
+    // Initialize Matcher
+    cv::FlannBasedMatcher matcher;
+
+    // Iterate through images provided as arguments to create new targets.
+    for (int i = 0; i < argc; i++) {
+        Target loaded = Target(std::string(argv[i]));
+        loaded.get_keypoints(detector);
+        loaded.get_descriptors(extractor);
+        targets.push_back(loaded);
+    }
+    
+    //  cv::Mat textbook_out;
+    
     // Get the corners of the object
-    std::vector<cv::Point2f> textbook_corners(4);
-    textbook_corners[0] = cv::Point2f(1,1);
-    textbook_corners[1] = cv::Point2f(textbook.cols - 1, 1);
-    textbook_corners[2] = cv::Point2f(textbook.cols - 1, textbook.rows - 1);
-    textbook_corners[3] = cv::Point2f(1, textbook.rows - 1);
     
     //cv::drawKeypoints(textbook, textbook_kp, textbook_out, cv::Scalar(255, 255, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
     //cv::namedWindow("Textbook", cv::WINDOW_AUTOSIZE );
@@ -62,7 +106,8 @@ int main() {
 
     // Store current state of tracking
     bool tracking = false;
-    std::vector<cv::Point2f> tracking_pts[3];
+    Target* tracking_target = NULL;
+    std::vector<cv::Point2f> tracking_pts[3]; // BLACK MAGIC
     int tracking_pts_count = 0;
     
     // Loop until the user presses any key
@@ -86,53 +131,57 @@ int main() {
             
             cv::drawKeypoints(frame, kp, out, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
             
-            // Perform matching
-            std::vector< std::vector<cv::DMatch> > matches;
-            matcher.knnMatch(textbook_descriptors, descriptors, matches, 2);
-            
-            // Perform ratio test on matches
-            std::vector< cv::DMatch > good_matches;
-            
-            float ratio = 0.6f;
-            
-            for(int i = 0; i < matches.size(); i++)
-            {
-                if (matches[i].size() < 2) {
-                    continue;
-                }
-                
-                const cv::DMatch &m1 = matches[i][0];
-                const cv::DMatch &m2 = matches[i][1];
-                
-                if(m1.distance <= ratio * m2.distance) {
-                    good_matches.push_back(m1);
-                }
-            }
-            
-            //std::cout << "Textbook: " << good_matches.size() << " matching points" << std::endl;
-            
-            if(good_matches.size() > 25) {
-                
-                std::cout << "Textbook detected - tracking..." << std::endl;
-                
-                std::vector<cv::Point2f> textbook_pt;
-                std::vector<cv::Point2f> frame_pt;
-                
-                for(int i = 0; i < good_matches.size(); i++) {
-                    textbook_pt.push_back(textbook_kp[good_matches[i].queryIdx].pt);
-                    frame_pt.push_back(kp[good_matches[i].trainIdx].pt);
-                }
-                
-                cv::goodFeaturesToTrack(textbook_gray, tracking_pts[0], 200, 0.01, 10, cv::Mat(), 3, 0, 0.04);
-                tracking_pts[0].insert(tracking_pts[0].end(), textbook_corners.begin(), textbook_corners.end());  
-                cv::Mat h = cv::findHomography(textbook_pt, frame_pt, CV_RANSAC, 10);
+            for (int i = 0; i < targets.size() ; i++) {
 
-                tracking_pts_count = tracking_pts[0].size();
+                // Perform matching
+                std::vector< std::vector<cv::DMatch> > matches;
+                matcher.knnMatch(targets[i].descriptors, descriptors, matches, 2);
                 
-                // Transform the tracking points using the homography
-                cv::perspectiveTransform(tracking_pts[0], tracking_pts[1], h);
+                // Perform ratio test on matches
+                std::vector< cv::DMatch > good_matches;
                 
-                tracking = true;
+                float ratio = 0.6f;
+                
+                for(int i = 0; i < matches.size(); i++)
+                {
+                    if (matches[i].size() < 2) {
+                        continue;
+                    }
+                    
+                    const cv::DMatch &m1 = matches[i][0];
+                    const cv::DMatch &m2 = matches[i][1];
+                    
+                    if(m1.distance <= ratio * m2.distance) {
+                        good_matches.push_back(m1);
+                    }
+                }
+                
+                //std::cout << "Textbook: " << good_matches.size() << " matching points" << std::endl;
+                
+                if(good_matches.size() > 25) {
+                    
+                    std::cout << targets[i].name << " detected - tracking..." << std::endl;
+                    
+                    std::vector<cv::Point2f> target_pt;
+                    std::vector<cv::Point2f> frame_pt;
+                    
+                    for(int i = 0; i < good_matches.size(); i++) {
+                        target_pt.push_back(targets[i].kp[good_matches[i].queryIdx].pt);
+                        frame_pt.push_back(kp[good_matches[i].trainIdx].pt);
+                    }
+                    
+                    cv::goodFeaturesToTrack(targets[i].gray, tracking_pts[0], 200, 0.01, 10, cv::Mat(), 3, 0, 0.04);
+                    tracking_pts[0].insert(tracking_pts[0].end(), targets[i].corners.begin(), targets[i].corners.end());  
+                    cv::Mat h = cv::findHomography(target_pt, frame_pt, CV_RANSAC, 10);
+
+                    tracking_pts_count = tracking_pts[0].size();
+                    
+                    // Transform the tracking points using the homography
+                    cv::perspectiveTransform(tracking_pts[0], tracking_pts[1], h);
+                    
+                    tracking = true;
+                    tracking_target = targets[i];
+                }
             }
 
         }
@@ -155,7 +204,7 @@ int main() {
             }
             
             if(tracking_pts[0].size() < tracking_pts_count * 0.5) {
-                std::cout << "Textbook lost -  resuming detection..." << std::endl;
+                std::cout << tracking_target->name << " lost -  resuming detection..." << std::endl;
                 tracking = false;
             }
 
@@ -165,7 +214,7 @@ int main() {
             
                 // Transform the image using the homography
                 std::vector<cv::Point2f> frame_corners(4);
-                cv::perspectiveTransform(textbook_corners, frame_corners, h);
+                cv::perspectiveTransform(tracking_target->corners, frame_corners, h);
                 
                 // Draw lines around the object
                 cv::Scalar color(255, 0, 0);
