@@ -134,10 +134,13 @@ int main(int argc, char* argv[]) {
         //cv::drawKeypoints(frame, kp, out, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
             
         for (int i = 0; i < targets.size(); i++) {
-            if(targets[i].detected == false) {
+
+            Target &target = targets[i];
+            
+            if(target.detected == false) {
 	            // Perform matching
 	            std::vector< std::vector<cv::DMatch> > matches;
-	            matcher.knnMatch(targets[i].descriptors, descriptors, matches, 2);
+	            matcher.knnMatch(target.descriptors, descriptors, matches, 2);
 	            
 	            // Perform ratio test on matches
 	            std::vector<cv::DMatch> good_matches;
@@ -158,7 +161,7 @@ int main(int argc, char* argv[]) {
 	                }
 	            }
 	            
-	            std::cout << targets[i].name << ": " << good_matches.size() << " matching points" << std::endl;
+	            std::cout << target.name << ": " << good_matches.size() << " matching points" << std::endl;
 	            
 	            if(good_matches.size() < 10) {
 	            	continue;
@@ -168,7 +171,7 @@ int main(int argc, char* argv[]) {
                 std::vector<cv::Point2f> frame_pt;
                 
                 for(int j = 0; j < good_matches.size(); j++) {
-                    target_pt.push_back(targets[i].kp[good_matches[j].queryIdx].pt);
+                    target_pt.push_back(target.kp[good_matches[j].queryIdx].pt);
                     frame_pt.push_back(kp[good_matches[j].trainIdx].pt);
                 }
 
@@ -189,16 +192,16 @@ int main(int argc, char* argv[]) {
 
                 if(fraction > 0.1) {
                 
-                    std::cout << targets[i].name << " detected - tracking..." << std::endl;
+                    std::cout << target.name << " detected - tracking..." << std::endl;
                     
-                    cv::goodFeaturesToTrack(targets[i].gray, targets[i].points, 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
+                    cv::goodFeaturesToTrack(target.gray, target.points, 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
                
-                    targets[i].points_count = targets[i].points.size();
+                    target.points_count = target.points.size();
                 
                     // Transform the tracking points using the homography
-                    cv::perspectiveTransform(targets[i].points, targets[i].points_previous, h);
+                    cv::perspectiveTransform(target.points, target.points_previous, h);
                     
-                    targets[i].detected = true;
+                    target.detected = true;
 	            }
             }
 
@@ -207,31 +210,31 @@ int main(int argc, char* argv[]) {
 	            std::vector<uchar> status;
 	            std::vector<float> err;
 	            cv::Size window(25, 25);
-	            cv::calcOpticalFlowPyrLK(gray_prev, gray, targets[i].points_previous, targets[i].points_current, status, err, window, 3);
+	            cv::calcOpticalFlowPyrLK(gray_prev, gray, target.points_previous, target.points_current, status, err, window, 3);
 	            
 	            // Delete points from tracking for which the flow cannot be calculated
 	            int deleted = 0;
 	            for(int i = 0; i < status.size(); i++) {
 	                
 	                if(status[i] != 1 || err[i] > 10 ) {
-	                    targets[i].points.erase(targets[i].points.begin() + i - deleted);
-	                    targets[i].points_current.erase(targets[i].points_current.begin() + i - deleted);
+	                    target.points.erase(target.points.begin() + i - deleted);
+	                    target.points_current.erase(target.points_current.begin() + i - deleted);
 	                    deleted++;
 	                }
 	            }
 	            
-	            if(targets[i].points.size() < targets[i].points_count * 0.25) {
-	                std::cout << targets[i]->name << " lost -  resuming detection..." << std::endl;
-	                targets[i].detected = false;
+	            if(target.points.size() < target.points_count * 0.25) {
+	                std::cout << target.name << " lost -  resuming detection..." << std::endl;
+	                target.detected = false;
 	            }
 
 	            else{
 
-	                cv::Mat h = cv::findHomography(targets[i].points, targets[i].points_current, CV_RANSAC, 10);
+	                cv::Mat h = cv::findHomography(target.points, target.points_current, CV_RANSAC, 10);
 	            
 	                // Transform the image using the homography
 	                std::vector<cv::Point2f> frame_corners(4);
-	                cv::perspectiveTransform(targets[i]->corners, frame_corners, h);
+	                cv::perspectiveTransform(target.corners, frame_corners, h);
 	                
 	                // Draw lines around the object
 	                cv::Scalar color(255, 0, 0);
@@ -240,10 +243,10 @@ int main(int argc, char* argv[]) {
 	                cv::line(out, frame_corners[2], frame_corners[3], color, 2);
 	                cv::line(out, frame_corners[3], frame_corners[0], color, 2); 
 	                
-	                for(int i = 0; i < targets[i].points_current.size(); i++) {
-	                    cv::circle(out, targets[i].points_current[i], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0);
+	                for(int i = 0; i < target.points_current.size(); i++) {
+	                    cv::circle(out, target.points_current[i], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0);
 	                }
-	                targets[i].points_previous = targets[i].points_current;
+	                target.points_previous = target.points_current;
 	            }
 	        }
 	    }
