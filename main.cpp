@@ -24,8 +24,8 @@ class Target {
         std::vector<cv::Point2f> corners;
     public:
         Target(std::string);
-        void get_keypoints(cv::SiftFeatureDetector detector);
-        void get_descriptors(cv::SiftDescriptorExtractor extractor);
+        void get_keypoints(cv::SurfFeatureDetector detector);
+        void get_descriptors(cv::SurfDescriptorExtractor extractor);
 };
 
 // Constructor for Target class initializes image, name, gray, corners
@@ -51,11 +51,11 @@ Target::Target(std::string target_name) {
 // get_keypoints and get_descriptors sets the Target's keypoints and descriptors 
 // based on provided detector and extractor functions
 
-void Target::get_keypoints(cv::SiftFeatureDetector detector) {
+void Target::get_keypoints(cv::SurfFeatureDetector detector) {
     detector.detect(image, kp);
 }
 
-void Target::get_descriptors(cv::SiftDescriptorExtractor extractor) {
+void Target::get_descriptors(cv::SurfDescriptorExtractor extractor) {
     extractor.compute(image, kp, descriptors);
 }
 
@@ -82,9 +82,9 @@ int main(int argc, char* argv[]) {
     // Initialize webcam
     cv::VideoCapture webcam = init_webcam(0);
 
-    // Initialize SIFT
-    cv::SiftFeatureDetector detector;
-    cv::SiftDescriptorExtractor extractor;
+    // Initialize SURF
+    cv::SurfFeatureDetector detector(400);
+    cv::SurfDescriptorExtractor extractor;
 
     // Initialize Matcher
     cv::FlannBasedMatcher matcher;
@@ -133,18 +133,18 @@ int main(int argc, char* argv[]) {
             detector.detect(frame, kp);
             extractor.compute(frame, kp, descriptors);
             
-            cv::drawKeypoints(frame, kp, out, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+            //cv::drawKeypoints(frame, kp, out, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
             
-            for (int i = 0; i < targets.size() ; i++) {
-
+            for (int i = 0; i < targets.size(); i++) {
+                
                 // Perform matching
                 std::vector< std::vector<cv::DMatch> > matches;
                 matcher.knnMatch(targets[i].descriptors, descriptors, matches, 2);
                 
                 // Perform ratio test on matches
-                std::vector< cv::DMatch > good_matches;
+                std::vector<cv::DMatch> good_matches;
                 
-                float ratio = 0.8f;
+                float ratio = 0.6f;
                 
                 for(int j = 0; j < matches.size(); j++)
                 {
@@ -163,9 +163,7 @@ int main(int argc, char* argv[]) {
                 std::cout << targets[i].name << ": " << good_matches.size() << " matching points" << std::endl;
                 
                 if(good_matches.size() > 10) {
-                    
-                    std::cout << targets[i].name << " detected - tracking..." << std::endl;
-                    
+                                        
                     std::vector<cv::Point2f> target_pt;
                     std::vector<cv::Point2f> frame_pt;
                     
@@ -173,22 +171,40 @@ int main(int argc, char* argv[]) {
                         target_pt.push_back(targets[i].kp[good_matches[j].queryIdx].pt);
                         frame_pt.push_back(kp[good_matches[j].trainIdx].pt);
                     }
+
+                    cv::Mat mask;
+                    cv::Mat h = cv::findHomography(target_pt, frame_pt, CV_RANSAC, 10, mask);
+
+                    float in = 0.0f;
+                    float total = (float)target_pt.size();
+                    for(int j = 0; j < target_pt.size(); j++){
+                        if(mask.at<double>(j) == 0){
+                            in++;
+                        }
+                    }
+
+                    float fraction = in / total;
                     
-                    cv::goodFeaturesToTrack(targets[i].gray, tracking_pts[0], 200, 0.01, 10, cv::Mat(), 3, 0, 0.04);
-                    tracking_pts[0].insert(tracking_pts[0].end(), targets[i].corners.begin(), targets[i].corners.end());  
-                    cv::Mat h = cv::findHomography(target_pt, frame_pt, CV_RANSAC, 10);
+                    std::cout << fraction << " fraction inliers" << std::endl;
+
+                    if(fraction > 0.1) {
                     
-                    tracking_pts_count = tracking_pts[0].size();
+                        std::cout << targets[i].name << " detected - tracking..." << std::endl;
+                        
+                        cv::goodFeaturesToTrack(targets[i].gray, tracking_pts[0], 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
+                   
+                        tracking_pts_count = tracking_pts[0].size();
                     
-                    // Transform the tracking points using the homography
-                    cv::perspectiveTransform(tracking_pts[0], tracking_pts[1], h);
-                    
-                    tracking = true;
-                    tracking_target = &targets[i];
+                        // Transform the tracking points using the homography
+                        cv::perspectiveTransform(tracking_pts[0], tracking_pts[1], h);
+                        
+                        tracking = true;
+                        tracking_target = &targets[i];
+                    }
                 }
             }
-
         }
+
         else{
             
             std::vector<uchar> status;
@@ -200,14 +216,14 @@ int main(int argc, char* argv[]) {
             int deleted = 0;
             for(int i = 0; i < status.size(); i++) {
                 
-                if(status[i] != 1 || err[i] > 10) {
+                if(status[i] != 1 || err[i] > 10 ) {
                     tracking_pts[0].erase(tracking_pts[0].begin() + i - deleted);
                     tracking_pts[2].erase(tracking_pts[2].begin() + i - deleted);
                     deleted++;
                 }
             }
             
-            if(tracking_pts[0].size() < tracking_pts_count * 0.5) {
+            if(tracking_pts[0].size() < tracking_pts_count * 0.25) {
                 std::cout << tracking_target->name << " lost -  resuming detection..." << std::endl;
                 tracking = false;
             }
