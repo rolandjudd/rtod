@@ -144,7 +144,7 @@ int main(int argc, char* argv[]) {
                 // Perform ratio test on matches
                 std::vector< cv::DMatch > good_matches;
                 
-                float ratio = 0.6f;
+                float ratio = 0.8f;
                 
                 for(int j = 0; j < matches.size(); j++)
                 {
