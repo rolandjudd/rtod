@@ -83,6 +83,77 @@ cv::VideoCapture init_webcam(int id) {
     return webcam;
 }
 
+bool detect_target(Target target, cv::Mat frame_descriptors, cv::FlannBasedMatcher matcher) {
+
+    // Perform matching
+    std::vector< std::vector<cv::DMatch> > matches;
+    matcher.knnMatch(target.descriptors, frame_descriptors, matches, 2);
+    
+    // Perform ratio test on matches
+    std::vector<cv::DMatch> good_matches;
+    
+    float ratio = 0.6f;
+    
+    for(int j = 0; j < matches.size(); j++)
+    {
+        if (matches[j].size() < 2) {
+            continue;
+        }
+        
+        const cv::DMatch &m1 = matches[j][0];
+        const cv::DMatch &m2 = matches[j][1];
+        
+        if(m1.distance <= ratio * m2.distance) {
+            good_matches.push_back(m1);
+        }
+    }
+    
+    std::cout << target.name << ": " << good_matches.size() << " matching points" << std::endl;
+    
+    if(good_matches.size() < 7) {
+    	return false;
+    }
+                            
+    std::vector<cv::Point2f> target_pt;
+    std::vector<cv::Point2f> frame_pt;
+    
+    for(int j = 0; j < good_matches.size(); j++) {
+        target_pt.push_back(target.kp[good_matches[j].queryIdx].pt);
+        frame_pt.push_back(kp[good_matches[j].trainIdx].pt);
+    }
+
+    cv::Mat mask;
+    cv::Mat h = cv::findHomography(target_pt, frame_pt, CV_RANSAC, 10, mask);
+
+    float in = 0.0f;
+    float total = (float)target_pt.size();
+    for(int j = 0; j < target_pt.size(); j++){
+        if(mask.at<double>(j) == 0){
+            in++;
+        }
+    }
+
+    float fraction = in / total;
+    
+    std::cout << fraction << " fraction inliers" << std::endl;
+
+    if(fraction > 0.1) {
+    
+        std::cout << target.name << " detected - tracking..." << std::endl;
+        
+        cv::goodFeaturesToTrack(target.gray, target.points, 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
+   
+        target.points_count = target.points.size();
+    
+        // Transform the tracking points using the homography
+        cv::perspectiveTransform(target.points, target.points_previous, h);
+        
+        return true;
+    }
+
+    return false;
+}
+
 int main(int argc, char* argv[]) {
 
     std::vector<Target> targets;
@@ -140,72 +211,7 @@ int main(int argc, char* argv[]) {
             Target &target = targets[i];
             
             if(target.detected == false) {
-
-                // Perform matching
-	            std::vector< std::vector<cv::DMatch> > matches;
-	            matcher.knnMatch(target.descriptors, descriptors, matches, 2);
-	            
-	            // Perform ratio test on matches
-	            std::vector<cv::DMatch> good_matches;
-	            
-	            float ratio = 0.6f;
-	            
-	            for(int j = 0; j < matches.size(); j++)
-	            {
-	                if (matches[j].size() < 2) {
-	                    continue;
-	                }
-	                
-	                const cv::DMatch &m1 = matches[j][0];
-	                const cv::DMatch &m2 = matches[j][1];
-	                
-	                if(m1.distance <= ratio * m2.distance) {
-	                    good_matches.push_back(m1);
-	                }
-	            }
-	            
-	            std::cout << target.name << ": " << good_matches.size() << " matching points" << std::endl;
-	            
-	            if(good_matches.size() < 7) {
-	            	continue;
-	            }
-	                                    
-                std::vector<cv::Point2f> target_pt;
-                std::vector<cv::Point2f> frame_pt;
-                
-                for(int j = 0; j < good_matches.size(); j++) {
-                    target_pt.push_back(target.kp[good_matches[j].queryIdx].pt);
-                    frame_pt.push_back(kp[good_matches[j].trainIdx].pt);
-                }
-
-                cv::Mat mask;
-                cv::Mat h = cv::findHomography(target_pt, frame_pt, CV_RANSAC, 10, mask);
-
-                float in = 0.0f;
-                float total = (float)target_pt.size();
-                for(int j = 0; j < target_pt.size(); j++){
-                    if(mask.at<double>(j) == 0){
-                        in++;
-                    }
-                }
-
-                float fraction = in / total;
-                
-                std::cout << fraction << " fraction inliers" << std::endl;
-
-                if(fraction > 0.1) {
-                
-                    std::cout << target.name << " detected - tracking..." << std::endl;
-                    
-                    cv::goodFeaturesToTrack(target.gray, target.points, 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
-               
-                    target.points_count = target.points.size();
-                
-                    // Transform the tracking points using the homography
-                    cv::perspectiveTransform(target.points, target.points_previous, h);
-                    
-                    target.detected = true;
-	            }
+            	target.detected = detect_target(target, descriptors, matcher);
             }
 
 	        else{
