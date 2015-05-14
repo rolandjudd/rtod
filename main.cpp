@@ -154,6 +154,51 @@ void Target::detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame
     return;
 }
 
+void Target::track(cv::Mat frame_gray, cv::Mat frame_gray_prev) {
+
+    std::vector<uchar> status;
+    std::vector<float> err;
+    cv::Size window(41, 41);
+    cv::calcOpticalFlowPyrLK(frame_gray_prev, frame_gray, points_previous, points_current, status, err, window, 4);
+    
+    // Delete points from tracking for which the flow cannot be calculated
+    int deleted = 0;
+    for(int i = 0; i < status.size(); i++) {
+        
+        if(status[i] != 1 || err[i] > 10 ) {
+            points.erase(points.begin() + i - deleted);
+            points_current.erase(points_current.begin() + i - deleted);
+            deleted++;
+        }
+    }
+    
+    if(points.size() < points_count * 0.25) {
+        std::cout << name << " lost -  resuming detection..." << std::endl;
+        detected = false;
+    }
+
+    else{
+
+        cv::Mat h = cv::findHomography(points, points_current, CV_RANSAC, 10);
+        
+        // Transform the image using the homography
+        std::vector<cv::Point2f> frame_corners(4);
+        cv::perspectiveTransform(corners, frame_corners, h);
+        
+        // Draw lines around the object
+        cv::Scalar color(255, 0, 0);
+        cv::line(out, frame_corners[0], frame_corners[1], color, 2);
+        cv::line(out, frame_corners[1], frame_corners[2], color, 2);
+        cv::line(out, frame_corners[2], frame_corners[3], color, 2);
+        cv::line(out, frame_corners[3], frame_corners[0], color, 2); 
+        
+        for(int i = 0; i < points_current.size(); i++) {
+            cv::circle(out, points_current[i], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0);
+        }
+        points_previous = points_current;
+    }
+}
+
 int main(int argc, char* argv[]) {
     
     std::vector<Target> targets;
@@ -215,48 +260,7 @@ int main(int argc, char* argv[]) {
             }
             
 	        else {
-	           
-	            std::vector<uchar> status;
-	            std::vector<float> err;
-	            cv::Size window(41, 41);
-	            cv::calcOpticalFlowPyrLK(gray_prev, gray, target.points_previous, target.points_current, status, err, window, 4);
-	            
-	            // Delete points from tracking for which the flow cannot be calculated
-	            int deleted = 0;
-	            for(int i = 0; i < status.size(); i++) {
-	                
-	                if(status[i] != 1 || err[i] > 10 ) {
-	                    target.points.erase(target.points.begin() + i - deleted);
-	                    target.points_current.erase(target.points_current.begin() + i - deleted);
-	                    deleted++;
-	                }
-	            }
-	            
-	            if(target.points.size() < target.points_count * 0.25) {
-	                std::cout << target.name << " lost -  resuming detection..." << std::endl;
-	                target.detected = false;
-	            }
-
-	            else{
-
-	                cv::Mat h = cv::findHomography(target.points, target.points_current, CV_RANSAC, 10);
-                    
-	                // Transform the image using the homography
-	                std::vector<cv::Point2f> frame_corners(4);
-	                cv::perspectiveTransform(target.corners, frame_corners, h);
-	                
-                    // Draw lines around the object
-                    cv::Scalar color(255, 0, 0);
-	                cv::line(out, frame_corners[0], frame_corners[1], color, 2);
-	                cv::line(out, frame_corners[1], frame_corners[2], color, 2);
-	                cv::line(out, frame_corners[2], frame_corners[3], color, 2);
-	                cv::line(out, frame_corners[3], frame_corners[0], color, 2); 
-                    
-	                for(int i = 0; i < target.points_current.size(); i++) {
-	                    cv::circle(out, target.points_current[i], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0);
-	                }
-	                target.points_previous = target.points_current;
-	            }
+	        	target.track(gray_prev, gray)
 	        }
 	    }
         cv::imshow("Webcam", out);
