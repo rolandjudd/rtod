@@ -252,7 +252,7 @@ int main(int argc, char* argv[]) {
             }
             
 	        else {
-	        	target.track(gray_prev, gray);
+	        	target.track(gray, gray_prev);
 	        	for (int j = 0; j < target.points_current.size(); j++) {
        				cv::circle(out, target.points_current[j], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0); 
        			}
