@@ -177,12 +177,12 @@ int main(int argc, char* argv[]) {
         
         cv::Mat out;
         cv::drawKeypoints(loaded.image, loaded.kp, out, cv::Scalar(255, 255, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-        cv::namedWindow(loaded.name, cv::WINDOW_AUTOSIZE);
+        cv::namedWindow("opencv", cv::WINDOW_AUTOSIZE);
         cv::imshow(loaded.name, out);
     }
     
     // Open a window to display the webcam video
-    cv::namedWindow("Webcam", cv::WINDOW_AUTOSIZE );
+    cv::namedWindow("opencv", cv::WINDOW_AUTOSIZE );
 
     // Store the webcam frames
     cv::Mat frame, gray, gray_prev;
@@ -261,8 +261,8 @@ int main(int argc, char* argv[]) {
 	    }
         cv::imshow("Webcam", out);
         if (cv::waitKey(5) >= 0) {
-            std::cout << "Key pressed - Exiting" << std::endl;
-            break;
+            std::cout << "Key pressed" << std::endl;
+            //break;
         }
     }
     
