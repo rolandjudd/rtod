@@ -191,21 +191,24 @@ void Target::track(cv::Mat frame_gray, cv::Mat frame_gray_prev) {
 }
 
 void Target::label(cv::Mat &out) {
+
     cv::Point2f center(0,0);
 	for (int i=0; i < points_current.size(); i++) {
 		center.x += points_current[i].x;
 		center.y += points_current[i].y;
 	}
+    
 	center.x /= points_current.size();
 	center.y /= points_current.size();
 
-	int font_type = cv::FONT_HERSHEY_PLAIN;
-	int* baseline;
-	cv::Size text_box = cv::getTextSize(name, font_type, 2, 3, baseline);
+	int font_type = cv::FONT_HERSHEY_SIMPLEX;
+	int baseline;
+	cv::Size text_box = cv::getTextSize(name, font_type, 1, 2, &baseline);
 
 	center.x -= text_box.width/2;
-	center.y -= text_box.height/2;
-	cv::putText(out, name, center, font_type, 2, cv::Scalar(0, 255, 0), 3, 8, false);
+	center.y += text_box.height/2;
+
+    cv::putText(out, name, center, font_type, 1, cv::Scalar(0, 255, 0), 2, 8, false);
 }
 
 
