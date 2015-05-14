@@ -9,9 +9,13 @@
 #include "opencv2/nonfree/nonfree.hpp"
 #include "opencv2/video/tracking.hpp"
 #include <iostream>
+#include <sstream>
 
 // Global path for image loads; reconfigure to whatever directory you choose
 std::string base_path = "images/";
+
+// Output stream for batching output
+std::ostringstream os;
 
 // Target class to store data for object needing detection
 class Target {
@@ -34,7 +38,7 @@ class Target {
         void get_descriptors(cv::SurfDescriptorExtractor extractor);
 		void detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher);
 		void track(cv::Mat frame_gray, cv::Mat frame_gray_prev);
-		void label(cv::Mat out);
+		void label(cv::Mat &out);
 };
 
 // Constructor for Target class initializes image, name, gray, corners
@@ -111,7 +115,7 @@ void Target::detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame
         }
     }
     
-    std::cout << name << ": " << good_matches.size() << " matching points" << std::endl;
+    os << name << ": " << good_matches.size() << " matching points \n";
     
     if(good_matches.size() < 7) {
     	return;
@@ -137,21 +141,15 @@ void Target::detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame
     }
 
     float fraction = in / total;    
-    std::cout << fraction << " fraction inliers" << std::endl;
 
-    if(fraction > 0.1) {
+    cv::goodFeaturesToTrack(gray, points, 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
     
-        std::cout << name << " detected - tracking..." << std::endl;
+    points_count = points.size();
         
-        cv::goodFeaturesToTrack(gray, points, 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
-        
-        points_count = points.size();
-        
-        // Transform the tracking points using the homography
-        cv::perspectiveTransform(points, points_previous, h);
-        
-        detected = true;
-    }
+    // Transform the tracking points using the homography
+    cv::perspectiveTransform(points, points_previous, h);
+    
+    detected = true;
     
     return;
 }
@@ -175,7 +173,7 @@ void Target::track(cv::Mat frame_gray, cv::Mat frame_gray_prev) {
     }
     
     if(points.size() < points_count * 0.25) {
-        std::cout << name << " lost -  resuming detection..." << std::endl;
+        // std::cout << name << " lost -  resuming detection..." << std::endl;
         detected = false;
     }
 
@@ -193,14 +191,14 @@ void Target::track(cv::Mat frame_gray, cv::Mat frame_gray_prev) {
 }
 
 void Target::label(cv::Mat &out) {
-	Point2f center(0,0);
+    cv::Point2f center(0,0);
 	for (int i=0; i < points_current.size(); i++) {
 		center.x += points_current[i].x;
 		center.y += points_current[i].y;
 	}
-	center.x /= points_current[i].size();
-	center.y /= points_current[i].size();
-	cv::PutText(out, name, center, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1, 8, true);
+	center.x /= points_current.size();
+	center.y /= points_current.size();
+	cv::putText(out, name, center, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1, 8, false);
 }
 
 
@@ -224,16 +222,15 @@ int main(int argc, char* argv[]) {
         loaded.get_keypoints(detector);
         loaded.get_descriptors(extractor);
         targets.push_back(loaded);
-        
+
+        /*
         cv::Mat out;
         cv::drawKeypoints(loaded.image, loaded.kp, out, cv::Scalar(255, 255, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
         cv::namedWindow("opencv", cv::WINDOW_AUTOSIZE);
         cv::imshow(loaded.name, out);
+        */
     }
     
-    // Open a window to display the webcam video
-    cv::namedWindow("opencv", cv::WINDOW_AUTOSIZE );
-
     // Store the webcam frames
     cv::Mat frame, gray, gray_prev;
 
@@ -246,7 +243,7 @@ int main(int argc, char* argv[]) {
         cv::cvtColor(frame, gray, CV_BGR2GRAY); 
 
         cv::Mat out(frame);
-                    
+        
         // Keypoints and descriptors
         std::vector<cv::KeyPoint> kp;
         cv::Mat descriptors;
@@ -255,7 +252,9 @@ int main(int argc, char* argv[]) {
         extractor.compute(frame, kp, descriptors);
             
         //cv::drawKeypoints(frame, kp, out, cv::Scalar(255,255,255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-            
+
+        os << "==========================================\n";
+        
         for (int i = 0; i < targets.size(); i++) {
 
             Target &target = targets[i];
@@ -272,6 +271,11 @@ int main(int argc, char* argv[]) {
        			target.label(out);
 	        }
 	    }
+
+        os << "==========================================\n\n";
+
+        std::cout << os.str() << std::endl;
+        
         cv::imshow("Webcam", out);
         if (cv::waitKey(5) >= 0) {
             std::cout << "Key pressed" << std::endl;
