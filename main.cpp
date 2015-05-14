@@ -186,16 +186,7 @@ void Target::track(cv::Mat frame_gray, cv::Mat frame_gray_prev) {
         std::vector<cv::Point2f> frame_corners(4);
         cv::perspectiveTransform(corners, frame_corners, h);
         
-        // Draw lines around the object
-        cv::Scalar color(255, 0, 0);
-        cv::line(out, frame_corners[0], frame_corners[1], color, 2);
-        cv::line(out, frame_corners[1], frame_corners[2], color, 2);
-        cv::line(out, frame_corners[2], frame_corners[3], color, 2);
-        cv::line(out, frame_corners[3], frame_corners[0], color, 2); 
-        
-        for(int i = 0; i < points_current.size(); i++) {
-            cv::circle(out, points_current[i], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0);
-        }
+        // Set previous points equal to current
         points_previous = points_current;
     }
 }
@@ -262,6 +253,7 @@ int main(int argc, char* argv[]) {
             
 	        else {
 	        	target.track(gray_prev, gray)
+       			cv::circle(out, points_current[i], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0); 
 	        }
 	    }
         cv::imshow("Webcam", out);
