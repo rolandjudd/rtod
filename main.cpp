@@ -198,7 +198,14 @@ void Target::label(cv::Mat &out) {
 	}
 	center.x /= points_current.size();
 	center.y /= points_current.size();
-	cv::putText(out, name, center, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1, 8, false);
+
+	int font_type = cv::FONT_HERSHEY_PLAIN;
+	int* baseline;
+	cv::Size text_box = cv::getTextSize(name, font_type, 2, 3, baseline);
+
+	center.x -= text_box.width/2;
+	center.y -= text_box.height/2;
+	cv::putText(out, name, center, font_type, 2, cv::Scalar(0, 255, 0), 3, 8, false);
 }
 
 
