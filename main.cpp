@@ -34,6 +34,7 @@ class Target {
         void get_descriptors(cv::SurfDescriptorExtractor extractor);
 		void detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher);
 		void track(cv::Mat frame_gray, cv::Mat frame_gray_prev);
+		void label(cv::Mat out);
 };
 
 // Constructor for Target class initializes image, name, gray, corners
@@ -191,6 +192,18 @@ void Target::track(cv::Mat frame_gray, cv::Mat frame_gray_prev) {
     }
 }
 
+void Target::label(cv::Mat &out) {
+	Point2f center(0,0);
+	for (int i=0; i < points_current.size(); i++) {
+		center.x += points_current[i].x;
+		center.y += points_current[i].y;
+	}
+	center.x /= points_current[i].size();
+	center.y /= points_current[i].size();
+	cv::PutText(out, name, center, cv::FONT_HERSHEY_PLAIN, 1, cv::Scalar(0, 255, 0), 1, 8, true);
+}
+
+
 int main(int argc, char* argv[]) {
     
     std::vector<Target> targets;
@@ -256,6 +269,7 @@ int main(int argc, char* argv[]) {
 	        	for (int j = 0; j < target.points_current.size(); j++) {
        				cv::circle(out, target.points_current[j], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0); 
        			}
+       			target.label(out);
 	        }
 	    }
         cv::imshow("Webcam", out);
