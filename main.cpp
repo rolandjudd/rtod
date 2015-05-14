@@ -288,7 +288,6 @@ int main(int argc, char* argv[]) {
         
         cv::imshow("Webcam", out);
         if (cv::waitKey(5) >= 0) {
-            std::cout << "Key pressed" << std::endl;
             //break;
         }
     }
