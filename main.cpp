@@ -46,6 +46,8 @@ Target::Target(std::string target_name) {
         std::cerr << "Failed to load " << path << std::endl;
         exit(1);
     }
+
+    bool detected = false;
     
     cv::cvtColor(image, gray, CV_BGR2GRAY);
     corners.push_back(cv::Point2f(1,1));
@@ -101,7 +103,7 @@ int main(int argc, char* argv[]) {
         loaded.get_keypoints(detector);
         loaded.get_descriptors(extractor);
         targets.push_back(loaded);
-
+        
         cv::Mat out;
         cv::drawKeypoints(loaded.image, loaded.kp, out, cv::Scalar(255, 255, 255), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
         cv::namedWindow(loaded.name, cv::WINDOW_AUTOSIZE);
@@ -138,7 +140,8 @@ int main(int argc, char* argv[]) {
             Target &target = targets[i];
             
             if(target.detected == false) {
-	            // Perform matching
+
+                // Perform matching
 	            std::vector< std::vector<cv::DMatch> > matches;
 	            matcher.knnMatch(target.descriptors, descriptors, matches, 2);
 	            
@@ -163,7 +166,7 @@ int main(int argc, char* argv[]) {
 	            
 	            std::cout << target.name << ": " << good_matches.size() << " matching points" << std::endl;
 	            
-	            if(good_matches.size() < 10) {
+	            if(good_matches.size() < 7) {
 	            	continue;
 	            }
 	                                    
@@ -209,8 +212,8 @@ int main(int argc, char* argv[]) {
 	            
 	            std::vector<uchar> status;
 	            std::vector<float> err;
-	            cv::Size window(25, 25);
-	            cv::calcOpticalFlowPyrLK(gray_prev, gray, target.points_previous, target.points_current, status, err, window, 3);
+	            cv::Size window(41, 41);
+	            cv::calcOpticalFlowPyrLK(gray_prev, gray, target.points_previous, target.points_current, status, err, window, 4);
 	            
 	            // Delete points from tracking for which the flow cannot be calculated
 	            int deleted = 0;
@@ -231,18 +234,18 @@ int main(int argc, char* argv[]) {
 	            else{
 
 	                cv::Mat h = cv::findHomography(target.points, target.points_current, CV_RANSAC, 10);
-	            
+                    
 	                // Transform the image using the homography
 	                std::vector<cv::Point2f> frame_corners(4);
 	                cv::perspectiveTransform(target.corners, frame_corners, h);
 	                
-	                // Draw lines around the object
-	                cv::Scalar color(255, 0, 0);
+                    // Draw lines around the object
+                    cv::Scalar color(255, 0, 0);
 	                cv::line(out, frame_corners[0], frame_corners[1], color, 2);
 	                cv::line(out, frame_corners[1], frame_corners[2], color, 2);
 	                cv::line(out, frame_corners[2], frame_corners[3], color, 2);
 	                cv::line(out, frame_corners[3], frame_corners[0], color, 2); 
-	                
+                    
 	                for(int i = 0; i < target.points_current.size(); i++) {
 	                    cv::circle(out, target.points_current[i], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0);
 	                }
