@@ -32,7 +32,7 @@ class Target {
         Target(std::string);
         void get_keypoints(cv::SurfFeatureDetector detector);
         void get_descriptors(cv::SurfDescriptorExtractor extractor);
-		void detect_target(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher);
+		void detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher);
 };
 
 // Constructor for Target class initializes image, name, gray, corners
@@ -48,7 +48,7 @@ Target::Target(std::string target_name) {
         exit(1);
     }
 
-    bool detected = false;
+    detected = false;
     
     cv::cvtColor(image, gray, CV_BGR2GRAY);
     corners.push_back(cv::Point2f(1,1));
@@ -84,7 +84,7 @@ cv::VideoCapture init_webcam(int id) {
     return webcam;
 }
 
-void Target::detect_target(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher) {
+void Target::detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher) {
 
     // Perform matching
     std::vector< std::vector<cv::DMatch> > matches;
@@ -112,7 +112,6 @@ void Target::detect_target(cv::Mat frame_descriptors, std::vector< cv::KeyPoint 
     std::cout << name << ": " << good_matches.size() << " matching points" << std::endl;
     
     if(good_matches.size() < 7) {
-    	detected = false;
     	return;
     }
                             
@@ -143,22 +142,20 @@ void Target::detect_target(cv::Mat frame_descriptors, std::vector< cv::KeyPoint 
         std::cout << name << " detected - tracking..." << std::endl;
         
         cv::goodFeaturesToTrack(gray, points, 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
-   
+        
         points_count = points.size();
-    
+        
         // Transform the tracking points using the homography
         cv::perspectiveTransform(points, points_previous, h);
         
         detected = true;
-        return;
     }
-
-    detected = false;
+    
     return;
 }
 
 int main(int argc, char* argv[]) {
-
+    
     std::vector<Target> targets;
 
     // Initialize webcam
@@ -214,11 +211,11 @@ int main(int argc, char* argv[]) {
             Target &target = targets[i];
             
             if(target.detected == false) {
-            	target.detect_target(descriptors, kp, matcher);
+            	target.detect(descriptors, kp, matcher);
             }
-
-	        else{
-	            
+            
+	        else {
+	           
 	            std::vector<uchar> status;
 	            std::vector<float> err;
 	            cv::Size window(41, 41);
