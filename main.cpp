@@ -32,6 +32,7 @@ class Target {
         Target(std::string);
         void get_keypoints(cv::SurfFeatureDetector detector);
         void get_descriptors(cv::SurfDescriptorExtractor extractor);
+		void detect_target(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher);
 };
 
 // Constructor for Target class initializes image, name, gray, corners
@@ -83,11 +84,11 @@ cv::VideoCapture init_webcam(int id) {
     return webcam;
 }
 
-bool detect_target(Target target, cv::Mat frame_descriptors, cv::FlannBasedMatcher matcher) {
+void Target::detect_target(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher) {
 
     // Perform matching
     std::vector< std::vector<cv::DMatch> > matches;
-    matcher.knnMatch(target.descriptors, frame_descriptors, matches, 2);
+    matcher.knnMatch(descriptors, frame_descriptors, matches, 2);
     
     // Perform ratio test on matches
     std::vector<cv::DMatch> good_matches;
@@ -108,18 +109,19 @@ bool detect_target(Target target, cv::Mat frame_descriptors, cv::FlannBasedMatch
         }
     }
     
-    std::cout << target.name << ": " << good_matches.size() << " matching points" << std::endl;
+    std::cout << name << ": " << good_matches.size() << " matching points" << std::endl;
     
     if(good_matches.size() < 7) {
-    	return false;
+    	detected = false;
+    	return;
     }
                             
     std::vector<cv::Point2f> target_pt;
     std::vector<cv::Point2f> frame_pt;
     
     for(int j = 0; j < good_matches.size(); j++) {
-        target_pt.push_back(target.kp[good_matches[j].queryIdx].pt);
-        frame_pt.push_back(kp[good_matches[j].trainIdx].pt);
+        target_pt.push_back(kp[good_matches[j].queryIdx].pt);
+        frame_pt.push_back(frame_kp[good_matches[j].trainIdx].pt);
     }
 
     cv::Mat mask;
@@ -133,25 +135,26 @@ bool detect_target(Target target, cv::Mat frame_descriptors, cv::FlannBasedMatch
         }
     }
 
-    float fraction = in / total;
-    
+    float fraction = in / total;    
     std::cout << fraction << " fraction inliers" << std::endl;
 
     if(fraction > 0.1) {
     
-        std::cout << target.name << " detected - tracking..." << std::endl;
+        std::cout << name << " detected - tracking..." << std::endl;
         
-        cv::goodFeaturesToTrack(target.gray, target.points, 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
+        cv::goodFeaturesToTrack(gray, points, 25, 0.01, 10, cv::Mat(), 3, 0, 0.04);
    
-        target.points_count = target.points.size();
+        points_count = points.size();
     
         // Transform the tracking points using the homography
-        cv::perspectiveTransform(target.points, target.points_previous, h);
+        cv::perspectiveTransform(points, points_previous, h);
         
-        return true;
+        detected = true;
+        return;
     }
 
-    return false;
+    detected = false;
+    return;
 }
 
 int main(int argc, char* argv[]) {
@@ -211,7 +214,7 @@ int main(int argc, char* argv[]) {
             Target &target = targets[i];
             
             if(target.detected == false) {
-            	target.detected = detect_target(target, descriptors, matcher);
+            	target.detect_target(descriptors, kp, matcher);
             }
 
 	        else{
