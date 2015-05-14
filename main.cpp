@@ -253,7 +253,8 @@ int main(int argc, char* argv[]) {
             
 	        else {
 	        	target.track(gray_prev, gray);
-       			cv::circle(out, points_current[i], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0); 
+	        	for (int j = 0; j < target.points_current.size(); j++) {
+       			}
 	        }
 	    }
         cv::imshow("Webcam", out);
