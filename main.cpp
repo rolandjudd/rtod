@@ -33,6 +33,7 @@ class Target {
         void get_keypoints(cv::SurfFeatureDetector detector);
         void get_descriptors(cv::SurfDescriptorExtractor extractor);
 		void detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher);
+		void track(cv::Mat frame_gray, cv::Mat frame_gray_prev);
 };
 
 // Constructor for Target class initializes image, name, gray, corners
