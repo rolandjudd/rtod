@@ -158,8 +158,8 @@ void Target::track(cv::Mat frame_gray, cv::Mat frame_gray_prev) {
 
     std::vector<uchar> status;
     std::vector<float> err;
-    cv::Size window(41, 41);
-    cv::calcOpticalFlowPyrLK(frame_gray_prev, frame_gray, points_previous, points_current, status, err, window, 4);
+    cv::Size window(25, 25);
+    cv::calcOpticalFlowPyrLK(frame_gray_prev, frame_gray, points_previous, points_current, status, err, window, 3);
     
     // Delete points from tracking for which the flow cannot be calculated
     int deleted = 0;
