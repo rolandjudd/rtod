@@ -36,9 +36,9 @@ class Target {
         Target(std::string);
         void get_keypoints(cv::SurfFeatureDetector detector);
         void get_descriptors(cv::SurfDescriptorExtractor extractor);
-		void detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher);
-		void track(cv::Mat frame_gray, cv::Mat frame_gray_prev);
-		void label(cv::Mat &out);
+        void detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher);
+        void track(cv::Mat frame_gray, cv::Mat frame_gray_prev);
+        void label(cv::Mat &out);
 };
 
 // Constructor for Target class initializes image, name, gray, corners
@@ -74,22 +74,6 @@ void Target::get_descriptors(cv::SurfDescriptorExtractor extractor) {
     extractor.compute(image, kp, descriptors);
 }
 
-// Simple function to initialize a webcam given its id
-cv::VideoCapture init_webcam(int id) {
-    // 0 is the id of the video device (webcam)
-    cv::VideoCapture webcam = cv::VideoCapture(id);
-
-    //check if video stream was opened successfully
-    if (!webcam.isOpened()) {
-        std::cerr << "ERROR: Cannot open video stream" << std::endl;
-    }
-
-    // Change resolution of webcam
-    webcam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
-    webcam.set(CV_CAP_PROP_FRAME_HEIGHT,480);
-    return webcam;
-}
-
 void Target::detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame_kp, cv::FlannBasedMatcher matcher) {
 
     // Perform matching
@@ -118,7 +102,7 @@ void Target::detect(cv::Mat frame_descriptors, std::vector< cv::KeyPoint > frame
     os << name << ": " << good_matches.size() << " matching points \n";
     
     if(good_matches.size() < 7) {
-    	return;
+        return;
     }
                             
     std::vector<cv::Point2f> target_pt;
@@ -193,24 +177,44 @@ void Target::track(cv::Mat frame_gray, cv::Mat frame_gray_prev) {
 void Target::label(cv::Mat &out) {
 
     cv::Point2f center(0,0);
-	for (int i=0; i < points_current.size(); i++) {
-		center.x += points_current[i].x;
-		center.y += points_current[i].y;
-	}
+    for (int i=0; i < points_current.size(); i++) {
+        center.x += points_current[i].x;
+        center.y += points_current[i].y;
+    }
     
-	center.x /= points_current.size();
-	center.y /= points_current.size();
+    center.x /= points_current.size();
+    center.y /= points_current.size();
 
-	int font_type = cv::FONT_HERSHEY_SIMPLEX;
-	int baseline;
-	cv::Size text_box = cv::getTextSize(name, font_type, 1, 2, &baseline);
+    int font_type = cv::FONT_HERSHEY_SIMPLEX;
+    int baseline;
+    cv::Size text_box = cv::getTextSize(name, font_type, 1, 2, &baseline);
 
-	center.x -= text_box.width/2;
-	center.y += text_box.height/2;
+    center.x -= text_box.width/2;
+    center.y += text_box.height/2;
 
     cv::putText(out, name, center, font_type, 1, cv::Scalar(0, 255, 0), 2, 8, false);
+
+    for (int j = 0; j < points_current.size(); j++) {
+        cv::circle(out, points_current[j], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0); 
+    }
+
 }
 
+// Simple function to initialize a webcam given its id
+cv::VideoCapture init_webcam(int id) {
+    // 0 is the id of the video device (webcam)
+    cv::VideoCapture webcam = cv::VideoCapture(id);
+
+    //check if video stream was opened successfully
+    if (!webcam.isOpened()) {
+        std::cerr << "ERROR: Cannot open video stream" << std::endl;
+    }
+
+    // Change resolution of webcam
+    webcam.set(CV_CAP_PROP_FRAME_WIDTH, 640);
+    webcam.set(CV_CAP_PROP_FRAME_HEIGHT,480);
+    return webcam;
+}
 
 int main(int argc, char* argv[]) {
     
@@ -266,24 +270,21 @@ int main(int argc, char* argv[]) {
         os << "==========================================\n";
         
         for (int i = 0; i < targets.size(); i++) {
-
+            
             Target &target = targets[i];
             
             if(target.detected == false) {
-            	target.detect(descriptors, kp, matcher);
+                target.detect(descriptors, kp, matcher);
             }
             
-	        else {
-	        	target.track(gray, gray_prev);
-	        	for (int j = 0; j < target.points_current.size(); j++) {
-       				cv::circle(out, target.points_current[j], 5, cv::Scalar(0, 0, 255), CV_FILLED, 8, 0); 
-       			}
-       			target.label(out);
-	        }
-	    }
-
+            else {
+                target.track(gray, gray_prev);
+                target.label(out);
+            }
+        }
+        
         os << "==========================================\n\n";
-
+        
         std::cout << os.str() << std::endl;
         
         cv::imshow("Webcam", out);
